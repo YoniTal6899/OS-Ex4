@@ -7,6 +7,11 @@ all: client server
 client:  client.o
 	$(CC) $(FLAGS) -o client client.o
 
+test: test.o
+	$(CC) $(FLAGS) -o test test.o
+
+test.o: test.cpp
+	$(CC) $(FLAGS) -c test.cpp
 server:  server.o
 	$(CC) $(FLAGS) -pthread -o server server.o
 
@@ -18,4 +23,4 @@ client.o: client.cpp
 
 .PHONY: clean all
 clean:
-	rm -f *.o client server
+	rm -f *.o client server test

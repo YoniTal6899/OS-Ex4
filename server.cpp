@@ -13,33 +13,16 @@
 #include <pthread.h>
 #include "myStack.h"
 
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
 #define PORT "5555"
-
 #define BACKLOG 10
 
-void *get_IP_type(struct sockaddr *add)
-{
-    if (add->sa_family != AF_INET)
-    {
-        return &(((struct sockaddr_in6 *)add)->sin6_addr);        
-    }
-    return &(((struct sockaddr_in *)add)->sin_addr);    
-}
-void handle_sig(int harta_barta)
-{
-    int temp_err = errno;
-    while (waitpid(-1, NULL, WNOHANG) > 0){}
-    errno = temp_err;
-}
-
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 void *myThread(void *vargp)
 {   
     int len;
     char buff[1024];
     int sock_FD = *(int *)vargp;
-    while (1)
+    for (;;)
     {
         if((len = recv(sock_FD, buff, 1024, 0)) == -1)
         {
@@ -67,7 +50,7 @@ void *myThread(void *vargp)
                 continue;
             }
             char output[1024];
-            sprintf(output, "OUTPUT: %s", data);
+            sprintf(output, "OUTPUT: %s\n", data);
             printf("%s", output);
             if (send(sock_FD, output, strlen(output), 0) == -1){perror("send");}
         }
@@ -86,7 +69,6 @@ void *myThread(void *vargp)
                 continue;
             }
         }
-
         else
         {
             printf("%d closed connection!\n", sock_FD);
@@ -94,10 +76,22 @@ void *myThread(void *vargp)
         }
         pthread_mutex_unlock(&mutex);
     }
-
     close(sock_FD);
     return NULL;
 }
+void *get_IP_type(struct sockaddr *add)
+{
+    if (add->sa_family != AF_INET){return &(((struct sockaddr_in6 *)add)->sin6_addr);}
+    return &(((struct sockaddr_in *)add)->sin_addr);    
+}
+void handle_sig(int harta_barta)
+{
+    int temp_err = errno;
+    while (waitpid(-1, NULL, WNOHANG) > 0){}
+    errno = temp_err;
+}
+
+
 
 int main(void)
 {
@@ -120,17 +114,20 @@ int main(void)
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(a_i_flag));
          exit(1);
     }
-    for (curr = server_info; curr != NULL; curr = curr->ai_next)
+    curr=server_info;
+    while (curr != NULL)
     {
         if ((sock_FD = socket(curr->ai_family, curr->ai_socktype,curr->ai_protocol)) == -1)
         {
             perror("Error creating socket! :(\n");
+            curr = curr->ai_next;
             continue;
         }
         int one = 1;
         if (setsockopt(sock_FD, SOL_SOCKET, SO_REUSEADDR,&one,sizeof(int)) == -1)
         {
             perror("Error in setsockopt! :(\n");
+            curr = curr->ai_next;
             exit(1);
         }
 
@@ -138,8 +135,10 @@ int main(void)
         {
             close(sock_FD);
             perror("Error in bind! :(\n");
+            curr = curr->ai_next;
             continue;
         }
+        curr = curr->ai_next;
         break;
     }
     freeaddrinfo(server_info);
@@ -165,7 +164,7 @@ int main(void)
     }
     printf("Server is up!\nReady for connections!\n");
 
-    while (1)
+    for(;;)
     {
         sin_size = sizeof(client_add);
         client_FD = accept(sock_FD, (struct sockaddr *)&client_add, &sin_size);

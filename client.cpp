@@ -12,9 +12,8 @@
 
 #define PORT "5555"
 
-#define MAX_SIZE 100 // Max bytes
+#define MAX_SIZE 100
 
-// get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *add)
 {
     if (add->sa_family == AF_INET){return &(((struct sockaddr_in *)add)->sin_addr);}
@@ -39,18 +38,21 @@ int main(int argc, char *argv[])
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(a_i_flag));
         exit(1);
     }
-    // loop through all the results and connect to the first we can
-    for (curr = server_info; curr != NULL; curr = curr->ai_next)
+    curr = server_info;
+
+    while (curr != NULL)
     {
         if ((sock = socket(curr->ai_family, curr->ai_socktype,curr->ai_protocol)) == -1)
         {
             perror("ERROR creating socket! :(");
+            curr = curr->ai_next;
             continue;
         }
         if (connect(sock, curr->ai_addr, curr->ai_addrlen) == -1)
         {            
-            perror("ERROR connecting to client! :(");
+            perror("ERROR connecting to server! :(");
             close(sock);
+            curr = curr->ai_next;
             continue;
         }
         break;
@@ -66,17 +68,21 @@ int main(int argc, char *argv[])
     char buff[1024];
     int n = 0;
     int len;
-    while(1)
+    for(;;)
     {
         bzero(buff, sizeof(buff));
         n = 0;
         printf("Enter PUSH 'text', POP or TOP , to exit type EXIT\n");
         while ((buff[n++] = getchar()) != '\n'){}        
-        buff[strlen(buff)-1] = '\0';        
-        if (send(sock, buff, strlen(buff), 0) == -1){perror("send");}
+        buff[strlen(buff)-1] = '\0';
         
         if(strncmp(buff, "TOP", 3) == 0)
         {
+            if (send(sock, buff, strlen(buff), 0) == -1)
+            {
+            perror("send");
+            break;
+            }
             if((len = recv(sock, buff, 1024, 0)) == -1)
             {
                 perror("recv");
@@ -88,7 +94,11 @@ int main(int argc, char *argv[])
         }        
         else if((strncmp(buff, "EXIT", 4) == 0))
         {
-            if (send(sock, "EXIT", 4, 0) == -1){perror("send");}                
+            if (send(sock, buff, strlen(buff), 0) == -1)
+            {
+            perror("send");
+            break;
+            }             
             break;
         }
         else if((strncmp(buff, "PUSH", 4) == 0))
